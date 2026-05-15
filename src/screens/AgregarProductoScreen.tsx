@@ -16,7 +16,7 @@ function displayDate(dateStr: string): string {
 }
 
 export default function AgregarProductoScreen() {
-  const { addProduct } = useProductos();
+  const { addProduct, products, updateProductQuantity } = useProductos();
   const [nombre, setNombre] = useState('');
   const [marca, setMarca] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -33,11 +33,23 @@ export default function AgregarProductoScreen() {
   const [scanSuccess, setScanSuccess] = useState(false);
 
   async function handleAdd() {
-    if (!nombre || !fechaVencimiento) {
-      setScanMessage('❌ Completa el nombre y la fecha de vencimiento.');
-      setScanSuccess(false);
-      return;
-    }
+  if (!nombre || !fechaVencimiento) {
+    setScanMessage('❌ Completa el nombre y la fecha de vencimiento.');
+    setScanSuccess(false);
+    return;
+  }
+
+  const loteExistente = products.find(p =>
+    p.nombre.trim().toLowerCase() === nombre.trim().toLowerCase() &&
+    p.marca.trim().toLowerCase() === marca.trim().toLowerCase() &&
+    p.fechaVencimiento === fechaVencimiento
+  );
+
+  if (loteExistente) {
+    await updateProductQuantity(loteExistente.id, loteExistente.cantidad + (parseFloat(cantidad) || 1));
+    setScanMessage('✅ Cantidad sumada al lote existente.');
+    setScanSuccess(true);
+  } else {
     await addProduct({
       nombre, marca, categoria, codigoBarras,
       cantidad: parseFloat(cantidad) || 1,
@@ -47,12 +59,14 @@ export default function AgregarProductoScreen() {
       expiredNotified: false,
       expiringNotified: false,
     });
-    setSuccess(true);
     setScanMessage('');
-    setNombre(''); setMarca(''); setCategoria(''); setCodigoBarras('');
-    setCantidad(''); setPeso(''); setFechaIngreso(''); setFechaVencimiento('');
-    setTimeout(() => setSuccess(false), 3000);
+    setSuccess(true);
   }
+
+  setNombre(''); setMarca(''); setCategoria(''); setCodigoBarras('');
+  setCantidad(''); setPeso(''); setFechaIngreso(''); setFechaVencimiento('');
+  setTimeout(() => { setSuccess(false); setScanMessage(''); setScanSuccess(false); }, 3000);
+}
 
   async function handleScanned(barcode: string) {
     setShowScanner(false);

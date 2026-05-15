@@ -22,9 +22,47 @@ function statusText(dias: number): string {
   return `Vence en ${dias} dias`;
 }
 
+// Agrupa lotes por nombre + marca
+interface GrupoProducto {
+  nombre: string;
+  marca: string;
+  categoria: string;
+  lotes: ProductoCargado[];
+  totalCantidad: number;
+  totalPeso: number;
+  diasMinimos: number; // el lote que vence antes
+}
+
+function agruparProductos(products: ProductoCargado[]): GrupoProducto[] {
+  const mapa = new Map<string, GrupoProducto>();
+
+  products.forEach(p => {
+    const key = `${p.nombre.trim().toLowerCase()}|${p.marca.trim().toLowerCase()}`;
+    if (!mapa.has(key)) {
+      mapa.set(key, {
+        nombre: p.nombre,
+        marca: p.marca,
+        categoria: p.categoria,
+        lotes: [],
+        totalCantidad: 0,
+        totalPeso: 0,
+        diasMinimos: Infinity,
+      });
+    }
+    const grupo = mapa.get(key)!;
+    grupo.lotes.push(p);
+    grupo.totalCantidad += Math.floor(p.cantidad) || 0;
+    grupo.totalPeso += parseFloat(String(p.peso)) || 0;
+    const dias = diasParaVencer(p.fechaVencimiento);
+    if (dias < grupo.diasMinimos) grupo.diasMinimos = dias;
+  });
+
+  return Array.from(mapa.values()).sort((a, b) => a.diasMinimos - b.diasMinimos);
+}
+
 export default function InventarioScreen() {
   const { products, loading, refreshProducts, deleteProduct } = useProductos();
-  const [selected, setSelected] = useState<ProductoCargado | null>(null);
+  const [selectedGrupo, setSelectedGrupo] = useState<GrupoProducto | null>(null);
 
   useEffect(() => {
     refreshProducts();
@@ -32,8 +70,8 @@ export default function InventarioScreen() {
 
   function handleDelete(product: ProductoCargado) {
     Alert.alert(
-      'Eliminar producto',
-      `¿Seguro que queres eliminar "${product.nombre}"?`,
+      'Eliminar lote',
+      `¿Seguro que queres eliminar este lote de "${product.nombre}" (vence ${product.fechaVencimiento.split('-').reverse().join('/')})?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -41,16 +79,20 @@ export default function InventarioScreen() {
           style: 'destructive',
           onPress: async () => {
             await deleteProduct(product.id);
-            setSelected(null);
+            // Actualizar el grupo seleccionado después de eliminar
+            const lotesRestantes = selectedGrupo!.lotes.filter(l => l.id !== product.id);
+            if (lotesRestantes.length === 0) {
+              setSelectedGrupo(null);
+            } else {
+              setSelectedGrupo({ ...selectedGrupo!, lotes: lotesRestantes });
+            }
           }
         }
       ]
     );
   }
 
-  const sorted = [...products].sort((a, b) =>
-    new Date(a.fechaVencimiento).getTime() - new Date(b.fechaVencimiento).getTime()
-  );
+  const grupos = agruparProductos(products);
 
   if (loading) {
     return (
@@ -64,24 +106,27 @@ export default function InventarioScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
       <ScrollView contentContainerStyle={styles.content}>
-        {sorted.length === 0 ? (
+        {grupos.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>No hay productos en el inventario.</Text>
             <Text style={styles.emptySubtext}>Agrega uno desde el menu.</Text>
           </View>
         ) : (
-          sorted.map(product => {
-            const dias = diasParaVencer(product.fechaVencimiento);
-            const color = statusColor(dias);
+          grupos.map((grupo, idx) => {
+            const color = statusColor(grupo.diasMinimos);
             return (
-              <TouchableOpacity key={product.id} style={styles.card} onPress={() => setSelected(product)}>
+              <TouchableOpacity key={idx} style={styles.card} onPress={() => setSelectedGrupo(grupo)}>
                 <View style={styles.cardLeft}>
-                  <Text style={styles.cardName}>{product.nombre} <Text style={styles.cardBrand}>{product.marca}</Text></Text>
-                  <Text style={styles.cardQty}>{product.cantidad} ud. / {product.peso.toFixed(2)} kg.</Text>
+                  <Text style={styles.cardName}>
+                    {grupo.nombre} <Text style={styles.cardBrand}>{grupo.marca}</Text>
+                  </Text>
+                  <Text style={styles.cardQty}>
+                    {grupo.totalCantidad} ud. / {grupo.totalPeso.toFixed(2)} kg. · {grupo.lotes.length} {grupo.lotes.length === 1 ? 'lote' : 'lotes'}
+                  </Text>
                 </View>
                 <View style={styles.cardRight}>
-                  <Text style={[styles.cardStatus, { color }]}>{statusText(dias)}</Text>
-                  <Text style={styles.cardDate}>Venc: {product.fechaVencimiento.split('-').reverse().join('/')}</Text>
+                  <Text style={[styles.cardStatus, { color }]}>{statusText(grupo.diasMinimos)}</Text>
+                  <Text style={styles.cardDate}>Próximo venc.</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -89,43 +134,54 @@ export default function InventarioScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={!!selected} animationType="slide" transparent>
+      {/* Modal de detalle de lotes */}
+      <Modal visible={!!selectedGrupo} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {selected && (
+            {selectedGrupo && (
               <>
-                <Text style={styles.modalTitle}>{selected.nombre}</Text>
-                <Text style={styles.modalBrand}>{selected.marca}</Text>
+                <Text style={styles.modalTitle}>{selectedGrupo.nombre}</Text>
+                <Text style={styles.modalBrand}>{selectedGrupo.marca} · {selectedGrupo.categoria || 'Sin categoria'}</Text>
+                <Text style={styles.modalTotalLabel}>
+                  Total: {selectedGrupo.totalCantidad} ud. / {selectedGrupo.totalPeso.toFixed(2)} kg.
+                </Text>
 
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Categoria</Text>
-                  <Text style={styles.modalValue}>{selected.categoria || '-'}</Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Cantidad / Peso</Text>
-                  <Text style={styles.modalValue}>{selected.cantidad} ud. / {selected.peso.toFixed(2)} kg.</Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Fecha de ingreso</Text>
-                  <Text style={styles.modalValue}>{selected.fechaIngreso.split('-').reverse().join('/')}</Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Fecha de vencimiento</Text>
-                  <Text style={styles.modalValue}>{selected.fechaVencimiento.split('-').reverse().join('/')}</Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Estado</Text>
-                  <Text style={[styles.modalValue, { color: statusColor(diasParaVencer(selected.fechaVencimiento)), fontWeight: '700' }]}>
-                    {statusText(diasParaVencer(selected.fechaVencimiento))}
-                  </Text>
-                </View>
+                <Text style={styles.lotesTitle}>Lotes cargados</Text>
 
-                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelected(null)}>
+                <ScrollView style={styles.lotesScroll}>
+                  {selectedGrupo.lotes
+                    .sort((a, b) => new Date(a.fechaVencimiento).getTime() - new Date(b.fechaVencimiento).getTime())
+                    .map(lote => {
+                      const dias = diasParaVencer(lote.fechaVencimiento);
+                      return (
+                        <View key={lote.id} style={styles.loteCard}>
+                          <View style={styles.loteInfo}>
+                            <Text style={styles.loteVenc}>
+                              Venc: {lote.fechaVencimiento.split('-').reverse().join('/')}
+                            </Text>
+                            <Text style={[styles.loteStatus, { color: statusColor(dias) }]}>
+                              {statusText(dias)}
+                            </Text>
+                            <Text style={styles.loteCantidad}>
+                              {lote.cantidad} ud. / {parseFloat(String(lote.peso)).toFixed(2)} kg.
+                            </Text>
+                            <Text style={styles.loteIngreso}>
+                              Ingresado: {lote.fechaIngreso.split('-').reverse().join('/')}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.loteDeleteBtn}
+                            onPress={() => handleDelete(lote)}
+                          >
+                            <Text style={styles.loteDeleteText}>🗑️</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                </ScrollView>
+
+                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedGrupo(null)}>
                   <Text style={styles.closeBtnText}>Cerrar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(selected)}>
-                  <Text style={styles.deleteBtnText}>🗑️ Eliminar producto</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -152,14 +208,20 @@ const styles = StyleSheet.create({
   cardStatus: { fontSize: 13, fontWeight: '600' },
   cardDate: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 8, maxHeight: '85%' },
   modalTitle: { fontSize: 22, fontWeight: '800', color: '#111827' },
-  modalBrand: { fontSize: 15, color: '#6B7280', marginTop: -8 },
-  modalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  modalLabel: { fontSize: 14, color: '#6B7280' },
-  modalValue: { fontSize: 14, color: '#111827', fontWeight: '500' },
+  modalBrand: { fontSize: 14, color: '#6B7280' },
+  modalTotalLabel: { fontSize: 14, color: '#111827', fontWeight: '600', marginTop: 4 },
+  lotesTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginTop: 8, marginBottom: 4 },
+  lotesScroll: { maxHeight: 300 },
+  loteCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' },
+  loteInfo: { flex: 1, gap: 2 },
+  loteVenc: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  loteStatus: { fontSize: 13, fontWeight: '600' },
+  loteCantidad: { fontSize: 13, color: '#6B7280' },
+  loteIngreso: { fontSize: 12, color: '#9CA3AF' },
+  loteDeleteBtn: { padding: 8 },
+  loteDeleteText: { fontSize: 20 },
   closeBtn: { backgroundColor: '#111827', borderRadius: 10, padding: 16, alignItems: 'center', marginTop: 8 },
   closeBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  deleteBtn: { backgroundColor: '#FEE2E2', borderRadius: 10, padding: 16, alignItems: 'center' },
-  deleteBtnText: { color: '#EF4444', fontWeight: '700', fontSize: 16 },
 });

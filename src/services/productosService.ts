@@ -78,3 +78,11 @@ export async function buscarProductoPorBarcode(barcode: string) {
     return null;
   }
 }
+export async function actualizarCantidadProducto(id: number, cantidad: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/productos/cargados/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cantidad }),
+  });
+  if (!res.ok) throw new Error('Error al actualizar cantidad');
+}

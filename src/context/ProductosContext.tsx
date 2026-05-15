@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ProductoCargado, EventoReporte, EventType } from '../types/index';
-import { getProductosCargados, agregarProductoCargado, eliminarProductoCargado } from '../services/productosService';
+import { getProductosCargados, agregarProductoCargado, eliminarProductoCargado, actualizarCantidadProducto } from '../services/productosService';
 import { enviarNotificacionLocal } from '../services/notificaciones';
+
 
 interface ProductosContextType {
   products: ProductoCargado[];
@@ -12,6 +13,7 @@ interface ProductosContextType {
   logEvent: (type: EventType, message: string, productId: number | null) => void;
   checkExpirations: () => void;
   refreshProducts: () => Promise<void>;
+  updateProductQuantity: (id: number, cantidad: number) => Promise<void>;
 }
 
 const ProductosContext = createContext<ProductosContextType | undefined>(undefined);
@@ -32,6 +34,15 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }
+
+  async function updateProductQuantity(id: number, cantidad: number) {
+  try {
+    await actualizarCantidadProducto(id, cantidad);
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, cantidad } : p));
+  } catch (err) {
+    console.error('Error actualizando cantidad:', err);
+  }
+}
 
   useEffect(() => {
     refreshProducts();
@@ -94,10 +105,11 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ProductosContext.Provider value={{ products, eventLog, loading, addProduct, deleteProduct, logEvent, checkExpirations, refreshProducts }}>
-      {children}
-    </ProductosContext.Provider>
-  );
+    return (
+  <ProductosContext.Provider value={{ products, eventLog, loading, addProduct, deleteProduct, logEvent, checkExpirations, refreshProducts, updateProductQuantity }}>
+    {children}
+  </ProductosContext.Provider>
+);
 }
 
 export function useProductos() {
