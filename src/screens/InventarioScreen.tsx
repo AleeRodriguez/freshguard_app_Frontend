@@ -121,7 +121,7 @@ export default function InventarioScreen() {
                     {grupo.nombre} <Text style={styles.cardBrand}>{grupo.marca}</Text>
                   </Text>
                   <Text style={styles.cardQty}>
-                    {grupo.totalCantidad} ud. / {grupo.totalPeso.toFixed(2)} kg. · {grupo.lotes.length} {grupo.lotes.length === 1 ? 'lote' : 'lotes'}
+                    {grupo.totalCantidad} ud. · {grupo.lotes.length} {grupo.lotes.length === 1 ? 'lote' : 'lotes'} · {grupo.totalPeso.toFixed(2)} kg. total
                   </Text>
                 </View>
                 <View style={styles.cardRight}>
@@ -163,7 +163,7 @@ export default function InventarioScreen() {
                               {statusText(dias)}
                             </Text>
                             <Text style={styles.loteCantidad}>
-                              {lote.cantidad} ud. / {parseFloat(String(lote.peso)).toFixed(2)} kg.
+                              {lote.cantidad} {lote.cantidad === 1 ? 'paquete' : 'paquetes'} de {parseFloat(String(lote.peso)).toFixed(2)} kg. c/u
                             </Text>
                             <Text style={styles.loteIngreso}>
                               Ingresado: {lote.fechaIngreso.split('-').reverse().join('/')}

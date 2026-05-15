@@ -1,9 +1,10 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Alert } from 'react-native';
 import { useState } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useProductos } from '../context/ProductosContext';
 import ScannerScreen from './ScannerScreen';
 import { buscarProductoPorBarcode, buscarEnInventarioPorBarcode } from '../services/productosService';
+
 
 function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -38,6 +39,22 @@ export default function AgregarProductoScreen() {
     setScanSuccess(false);
     return;
   }
+  // Validación de fechas
+const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+const ingreso = new Date((fechaIngreso || formatDate(new Date())) + 'T00:00:00');
+const vencimiento = new Date(fechaVencimiento + 'T00:00:00');
+
+if (vencimiento < hoy) {
+  setScanMessage('❌ La fecha de vencimiento no puede ser anterior a hoy.');
+  setScanSuccess(false);
+  return;
+}
+
+if (vencimiento <= ingreso) {
+  setScanMessage('❌ La fecha de vencimiento debe ser posterior a la fecha de ingreso.');
+  setScanSuccess(false);
+  return;
+}
 
   const loteExistente = products.find(p =>
     p.nombre.trim().toLowerCase() === nombre.trim().toLowerCase() &&
@@ -50,18 +67,22 @@ export default function AgregarProductoScreen() {
     setScanMessage('✅ Cantidad sumada al lote existente.');
     setScanSuccess(true);
   } else {
-    await addProduct({
-      nombre, marca, categoria, codigoBarras,
-      cantidad: parseFloat(cantidad) || 1,
-      peso: parseFloat(peso) || 0,
-      fechaIngreso: fechaIngreso || formatDate(new Date()),
-      fechaVencimiento,
-      expiredNotified: false,
-      expiringNotified: false,
-    });
-    setScanMessage('');
-    setSuccess(true);
-  }
+  await addProduct({
+    nombre, marca, categoria, codigoBarras,
+    cantidad: parseFloat(cantidad) || 1,
+    peso: parseFloat(peso) || 0,
+    fechaIngreso: fechaIngreso || formatDate(new Date()),
+    fechaVencimiento,
+    expiredNotified: false,
+    expiringNotified: false,
+  });
+  Alert.alert(
+    '✅ Producto agregado',
+    `${nombre} fue cargado correctamente al inventario.`,
+    [{ text: 'OK' }]
+  );
+  setScanMessage('');
+}
 
   setNombre(''); setMarca(''); setCategoria(''); setCodigoBarras('');
   setCantidad(''); setPeso(''); setFechaIngreso(''); setFechaVencimiento('');
@@ -215,7 +236,13 @@ export default function AgregarProductoScreen() {
           </View>
           <View style={styles.halfField}>
             <Text style={styles.label}>Peso (kg.)</Text>
-            <TextInput style={styles.input} value={peso} onChangeText={setPeso} placeholder="0.00" keyboardType="numeric" />
+            <TextInput 
+  style={styles.input} 
+  value={peso} 
+  onChangeText={v => setPeso(v.replace(',', '.'))} 
+  placeholder="0.00" 
+  keyboardType="decimal-pad" 
+/>
           </View>
         </View>
 
