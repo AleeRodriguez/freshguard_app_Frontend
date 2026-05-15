@@ -66,17 +66,31 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   function checkExpirations() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const alertDate = new Date(today); alertDate.setDate(today.getDate() + 7);
-    products.forEach(p => {
+
+    let huboCambios = false;
+
+    const updatedProducts = products.map(p => {
+      const updated = { ...p };
       const expiryDate = new Date(p.fechaVencimiento + 'T00:00:00');
+
       if (expiryDate < today && !p.expiredNotified) {
         logEvent('expired', `El producto '${p.nombre}' ha vencido.`, p.id);
         enviarNotificacionLocal('⚠️ Producto vencido', `${p.nombre} ha vencido.`);
+        updated.expiredNotified = true;
+        huboCambios = true;
       }
+
       if (expiryDate <= alertDate && expiryDate >= today && !p.expiringNotified) {
         logEvent('expiring', `El producto '${p.nombre}' esta proximo a vencer.`, p.id);
         enviarNotificacionLocal('🕐 Proximo a vencer', `${p.nombre} vence pronto.`);
+        updated.expiringNotified = true;
+        huboCambios = true;
       }
+
+      return updated;
     });
+
+    if (huboCambios) setProducts(updatedProducts);
   }
 
   return (

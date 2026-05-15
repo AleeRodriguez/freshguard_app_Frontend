@@ -7,8 +7,8 @@ export default function DashboardScreen() {
   const { products, checkExpirations } = useProductos();
 
   useEffect(() => {
-    checkExpirations();
-  }, [products]);
+  checkExpirations();
+}, []); // <-- sin dependencias
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const alertDate = new Date(today); alertDate.setDate(today.getDate() + 7);
