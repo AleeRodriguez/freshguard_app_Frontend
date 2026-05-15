@@ -34,60 +34,60 @@ export default function AgregarProductoScreen() {
   const [scanSuccess, setScanSuccess] = useState(false);
 
   async function handleAdd() {
-  if (!nombre || !fechaVencimiento) {
-    setScanMessage('❌ Completa el nombre y la fecha de vencimiento.');
-    setScanSuccess(false);
-    return;
+    if (!nombre || !fechaVencimiento) {
+      setScanMessage('❌ Completa el nombre y la fecha de vencimiento.');
+      setScanSuccess(false);
+      return;
+    }
+    // Validación de fechas
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const ingreso = new Date((fechaIngreso || formatDate(new Date())) + 'T00:00:00');
+    const vencimiento = new Date(fechaVencimiento + 'T00:00:00');
+
+    if (vencimiento < hoy) {
+      setScanMessage('❌ La fecha de vencimiento no puede ser anterior a hoy.');
+      setScanSuccess(false);
+      return;
+    }
+
+    if (vencimiento <= ingreso) {
+      setScanMessage('❌ La fecha de vencimiento debe ser posterior a la fecha de ingreso.');
+      setScanSuccess(false);
+      return;
+    }
+
+    const loteExistente = products.find(p =>
+      p.nombre.trim().toLowerCase() === nombre.trim().toLowerCase() &&
+      p.marca.trim().toLowerCase() === marca.trim().toLowerCase() &&
+      p.fechaVencimiento === fechaVencimiento
+    );
+
+    if (loteExistente) {
+      await updateProductQuantity(loteExistente.id, loteExistente.cantidad + (parseFloat(cantidad) || 1));
+      setScanMessage('✅ Cantidad sumada al lote existente.');
+      setScanSuccess(true);
+    } else {
+      await addProduct({
+        nombre, marca, categoria, codigoBarras,
+        cantidad: parseFloat(cantidad) || 1,
+        peso: parseFloat(peso) || 0,
+        fechaIngreso: fechaIngreso || formatDate(new Date()),
+        fechaVencimiento,
+        expiredNotified: false,
+        expiringNotified: false,
+      });
+      Alert.alert(
+        '✅ Producto agregado',
+        `${nombre} fue cargado correctamente al inventario.`,
+        [{ text: 'OK' }]
+      );
+      setScanMessage('');
+    }
+
+    setNombre(''); setMarca(''); setCategoria(''); setCodigoBarras('');
+    setCantidad(''); setPeso(''); setFechaIngreso(''); setFechaVencimiento('');
+    setTimeout(() => { setSuccess(false); setScanMessage(''); setScanSuccess(false); }, 3000);
   }
-  // Validación de fechas
-const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-const ingreso = new Date((fechaIngreso || formatDate(new Date())) + 'T00:00:00');
-const vencimiento = new Date(fechaVencimiento + 'T00:00:00');
-
-if (vencimiento < hoy) {
-  setScanMessage('❌ La fecha de vencimiento no puede ser anterior a hoy.');
-  setScanSuccess(false);
-  return;
-}
-
-if (vencimiento <= ingreso) {
-  setScanMessage('❌ La fecha de vencimiento debe ser posterior a la fecha de ingreso.');
-  setScanSuccess(false);
-  return;
-}
-
-  const loteExistente = products.find(p =>
-    p.nombre.trim().toLowerCase() === nombre.trim().toLowerCase() &&
-    p.marca.trim().toLowerCase() === marca.trim().toLowerCase() &&
-    p.fechaVencimiento === fechaVencimiento
-  );
-
-  if (loteExistente) {
-    await updateProductQuantity(loteExistente.id, loteExistente.cantidad + (parseFloat(cantidad) || 1));
-    setScanMessage('✅ Cantidad sumada al lote existente.');
-    setScanSuccess(true);
-  } else {
-  await addProduct({
-    nombre, marca, categoria, codigoBarras,
-    cantidad: parseFloat(cantidad) || 1,
-    peso: parseFloat(peso) || 0,
-    fechaIngreso: fechaIngreso || formatDate(new Date()),
-    fechaVencimiento,
-    expiredNotified: false,
-    expiringNotified: false,
-  });
-  Alert.alert(
-    '✅ Producto agregado',
-    `${nombre} fue cargado correctamente al inventario.`,
-    [{ text: 'OK' }]
-  );
-  setScanMessage('');
-}
-
-  setNombre(''); setMarca(''); setCategoria(''); setCodigoBarras('');
-  setCantidad(''); setPeso(''); setFechaIngreso(''); setFechaVencimiento('');
-  setTimeout(() => { setSuccess(false); setScanMessage(''); setScanSuccess(false); }, 3000);
-}
 
   async function handleScanned(barcode: string) {
     setShowScanner(false);
@@ -161,7 +161,7 @@ if (vencimiento <= ingreso) {
             <DateTimePicker
               value={value ? new Date(value + 'T00:00:00') : new Date()}
               mode="date"
-              display="default"
+              display="spinner"
               onChange={(_, date) => {
                 setShowPicker(false);
                 if (date) onChange(formatDate(date));
@@ -236,13 +236,13 @@ if (vencimiento <= ingreso) {
           </View>
           <View style={styles.halfField}>
             <Text style={styles.label}>Peso (kg.)</Text>
-            <TextInput 
-  style={styles.input} 
-  value={peso} 
-  onChangeText={v => setPeso(v.replace(',', '.'))} 
-  placeholder="0.00" 
-  keyboardType="decimal-pad" 
-/>
+            <TextInput
+              style={styles.input}
+              value={peso}
+              onChangeText={v => setPeso(v.replace(',', '.'))}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+            />
           </View>
         </View>
 

@@ -22,42 +22,35 @@ function statusText(dias: number): string {
   return `Vence en ${dias} dias`;
 }
 
-// Agrupa lotes por nombre + marca
 interface GrupoProducto {
   nombre: string;
   marca: string;
   categoria: string;
   lotes: ProductoCargado[];
-  totalCantidad: number;
-  totalPeso: number;
-  diasMinimos: number; // el lote que vence antes
+  diasMinimos: number;
 }
 
 function agruparProductos(products: ProductoCargado[]): GrupoProducto[] {
   const mapa = new Map<string, GrupoProducto>();
-
   products.forEach(p => {
     const key = `${p.nombre.trim().toLowerCase()}|${p.marca.trim().toLowerCase()}`;
     if (!mapa.has(key)) {
-      mapa.set(key, {
-        nombre: p.nombre,
-        marca: p.marca,
-        categoria: p.categoria,
-        lotes: [],
-        totalCantidad: 0,
-        totalPeso: 0,
-        diasMinimos: Infinity,
-      });
+      mapa.set(key, { nombre: p.nombre, marca: p.marca, categoria: p.categoria, lotes: [], diasMinimos: Infinity });
     }
     const grupo = mapa.get(key)!;
     grupo.lotes.push(p);
-    grupo.totalCantidad += Math.floor(p.cantidad) || 0;
-    grupo.totalPeso += parseFloat(String(p.peso)) || 0;
     const dias = diasParaVencer(p.fechaVencimiento);
     if (dias < grupo.diasMinimos) grupo.diasMinimos = dias;
   });
-
   return Array.from(mapa.values()).sort((a, b) => a.diasMinimos - b.diasMinimos);
+}
+
+function calcTotalCantidad(lotes: ProductoCargado[]): number {
+  return lotes.reduce((acc, l) => acc + (Number(l.cantidad) || 0), 0);
+}
+
+function calcTotalPeso(lotes: ProductoCargado[]): number {
+  return lotes.reduce((acc, l) => acc + (Number(l.peso) || 0) * (Number(l.cantidad) || 1), 0);
 }
 
 export default function InventarioScreen() {
@@ -71,7 +64,7 @@ export default function InventarioScreen() {
   function handleDelete(product: ProductoCargado) {
     Alert.alert(
       'Eliminar lote',
-      `¿Seguro que queres eliminar este lote de "${product.nombre}" (vence ${product.fechaVencimiento.split('-').reverse().join('/')})?`,
+      `¿Seguro que queres eliminar este lote de "${product.nombre}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -79,7 +72,6 @@ export default function InventarioScreen() {
           style: 'destructive',
           onPress: async () => {
             await deleteProduct(product.id);
-            // Actualizar el grupo seleccionado después de eliminar
             const lotesRestantes = selectedGrupo!.lotes.filter(l => l.id !== product.id);
             if (lotesRestantes.length === 0) {
               setSelectedGrupo(null);
@@ -113,6 +105,8 @@ export default function InventarioScreen() {
           </View>
         ) : (
           grupos.map((grupo, idx) => {
+            const totalCantidad = calcTotalCantidad(grupo.lotes);
+            const totalPeso = calcTotalPeso(grupo.lotes);
             const color = statusColor(grupo.diasMinimos);
             return (
               <TouchableOpacity key={idx} style={styles.card} onPress={() => setSelectedGrupo(grupo)}>
@@ -121,7 +115,7 @@ export default function InventarioScreen() {
                     {grupo.nombre} <Text style={styles.cardBrand}>{grupo.marca}</Text>
                   </Text>
                   <Text style={styles.cardQty}>
-                    {grupo.totalCantidad} ud. · {grupo.lotes.length} {grupo.lotes.length === 1 ? 'lote' : 'lotes'} · {grupo.totalPeso.toFixed(2)} kg. total
+                    {totalCantidad} ud. · {grupo.lotes.length} {grupo.lotes.length === 1 ? 'lote' : 'lotes'} · {totalPeso.toFixed(2)} kg. total
                   </Text>
                 </View>
                 <View style={styles.cardRight}>
@@ -134,7 +128,6 @@ export default function InventarioScreen() {
         )}
       </ScrollView>
 
-      {/* Modal de detalle de lotes */}
       <Modal visible={!!selectedGrupo} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -143,13 +136,13 @@ export default function InventarioScreen() {
                 <Text style={styles.modalTitle}>{selectedGrupo.nombre}</Text>
                 <Text style={styles.modalBrand}>{selectedGrupo.marca} · {selectedGrupo.categoria || 'Sin categoria'}</Text>
                 <Text style={styles.modalTotalLabel}>
-                  Total: {selectedGrupo.totalCantidad} ud. / {selectedGrupo.totalPeso.toFixed(2)} kg.
+                  Total: {calcTotalCantidad(selectedGrupo.lotes)} ud. / {calcTotalPeso(selectedGrupo.lotes).toFixed(2)} kg. totales
                 </Text>
 
                 <Text style={styles.lotesTitle}>Lotes cargados</Text>
 
                 <ScrollView style={styles.lotesScroll}>
-                  {selectedGrupo.lotes
+                  {[...selectedGrupo.lotes]
                     .sort((a, b) => new Date(a.fechaVencimiento).getTime() - new Date(b.fechaVencimiento).getTime())
                     .map(lote => {
                       const dias = diasParaVencer(lote.fechaVencimiento);
@@ -163,16 +156,13 @@ export default function InventarioScreen() {
                               {statusText(dias)}
                             </Text>
                             <Text style={styles.loteCantidad}>
-                              {lote.cantidad} {lote.cantidad === 1 ? 'paquete' : 'paquetes'} de {parseFloat(String(lote.peso)).toFixed(2)} kg. c/u
+                              {Number(lote.cantidad)} {Number(lote.cantidad) === 1 ? 'paquete' : 'paquetes'} de {Number(lote.peso).toFixed(2)} kg. c/u
                             </Text>
                             <Text style={styles.loteIngreso}>
                               Ingresado: {lote.fechaIngreso.split('-').reverse().join('/')}
                             </Text>
                           </View>
-                          <TouchableOpacity
-                            style={styles.loteDeleteBtn}
-                            onPress={() => handleDelete(lote)}
-                          >
+                          <TouchableOpacity style={styles.loteDeleteBtn} onPress={() => handleDelete(lote)}>
                             <Text style={styles.loteDeleteText}>🗑️</Text>
                           </TouchableOpacity>
                         </View>

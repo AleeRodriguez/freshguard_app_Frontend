@@ -3,7 +3,6 @@ import { ProductoCargado, EventoReporte, EventType } from '../types/index';
 import { getProductosCargados, agregarProductoCargado, eliminarProductoCargado, actualizarCantidadProducto } from '../services/productosService';
 import { enviarNotificacionLocal } from '../services/notificaciones';
 
-
 interface ProductosContextType {
   products: ProductoCargado[];
   eventLog: EventoReporte[];
@@ -36,13 +35,13 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   }
 
   async function updateProductQuantity(id: number, cantidad: number) {
-  try {
-    await actualizarCantidadProducto(id, cantidad);
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, cantidad } : p));
-  } catch (err) {
-    console.error('Error actualizando cantidad:', err);
+    try {
+      await actualizarCantidadProducto(id, cantidad);
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, cantidad } : p));
+    } catch (err) {
+      console.error('Error actualizando cantidad:', err);
+    }
   }
-}
 
   useEffect(() => {
     refreshProducts();
@@ -105,11 +104,10 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    return (
-  <ProductosContext.Provider value={{ products, eventLog, loading, addProduct, deleteProduct, logEvent, checkExpirations, refreshProducts, updateProductQuantity }}>
-    {children}
-  </ProductosContext.Provider>
-);
+    <ProductosContext.Provider value={{ products, eventLog, loading, addProduct, deleteProduct, logEvent, checkExpirations, refreshProducts, updateProductQuantity }}>
+      {children}
+    </ProductosContext.Provider>
+  );
 }
 
 export function useProductos() {
