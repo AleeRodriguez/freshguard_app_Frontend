@@ -20,4 +20,5 @@ export interface EventoReporte {
   message: string;
   timestamp: Date;
   productId: number | null;
+  usuarioNombre: string;
 }

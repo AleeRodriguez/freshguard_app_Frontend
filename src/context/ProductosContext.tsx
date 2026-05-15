@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { ProductoCargado, EventoReporte, EventType } from '../types/index';
 import { getProductosCargados, agregarProductoCargado, eliminarProductoCargado, actualizarCantidadProducto } from '../services/productosService';
 import { enviarNotificacionLocal } from '../services/notificaciones';
+import { useAuth } from './AuthContext';
 
 interface ProductosContextType {
   products: ProductoCargado[];
@@ -21,6 +22,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<ProductoCargado[]>([]);
   const [eventLog, setEventLog] = useState<EventoReporte[]>([]);
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   async function refreshProducts() {
     try {
@@ -47,9 +49,15 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     refreshProducts();
   }, []);
 
-  function logEvent(type: EventType, message: string, productId: number | null) {
-    setEventLog(prev => [...prev, { type, message, timestamp: new Date(), productId }]);
-  }
+ function logEvent(type: EventType, message: string, productId: number | null) {
+  setEventLog(prev => [...prev, { 
+    type, 
+    message, 
+    timestamp: new Date(), 
+    productId,
+    usuarioNombre: user?.nombre || 'Desconocido',
+  }]);
+}
 
   async function addProduct(product: Omit<ProductoCargado, 'id'>) {
     try {
