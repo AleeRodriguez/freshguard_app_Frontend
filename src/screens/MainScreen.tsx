@@ -15,7 +15,7 @@ import UsuariosScreen from './UsuariosScreen';
 type Section = 'dashboard' | 'inventario' | 'agregar' | 'reportes' | 'usuarios';
 
 const sectionTitles: Record<Section, string> = {
-  dashboard: 'FreshGuard',
+  dashboard: 'Dashboard',
   inventario: 'Inventario',
   agregar: 'Agregar Producto',
   reportes: 'Reportes',
@@ -78,6 +78,8 @@ export default function MainScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
+
+      {/* ✅ Navbar siempre muestra el título de texto, sin logo */}
       <View style={styles.header}>
         <TouchableOpacity onPress={openMenu} style={styles.menuBtn}>
           <Text style={styles.menuIcon}>☰</Text>
